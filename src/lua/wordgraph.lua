@@ -9,6 +9,7 @@ local table = table
 local io = io
 local os = os
 local string = string
+local loadfile = loadfile
 module(...)
 
 WordGraph = util.createClass()
@@ -33,13 +34,15 @@ local DEUBG = false
 
 -- Word class constructor.
 -- wordString
-function Word:_initializeInstance(wordString)
-    assert((wordString ~= nil) and (wordString ~= ''))
-    self:setString(wordString)
-    self:setChars(util.getCharArray(wordString))
-    self:setRelatives({})
-    self:setVisited(false)
-    self:setPredecessor(nil)
+function Word:_initializeInstance(initFromTable, wordString)
+    if not initFromTable then
+        assert((wordString ~= nil) and (wordString ~= ''))
+        self:setString(wordString)
+        self:setChars(util.getCharArray(wordString))
+        self:setRelatives({})
+        self:setVisited(nil)
+        self:setPredecessor(nil)
+    end
 end
 
 function Word:toString()
@@ -57,7 +60,32 @@ function Word:setRelated(relatedWord)
     relatedWord.relatives[self:getString()] = true
 end
 
-function WordGraph:_initializeInstance(dictionaryFile)
+function WordGraph:_initializeInstance(initFromTable, dictionaryFilename, logProgress)
+    if util.stringEndsWith(dictionaryFilename, '.lua') then
+        self:loadFromLuaFile(dictionaryFilename)
+    else
+        self:loadFromTextFile(dictionaryFilename, logProgress)
+    end
+end
+
+function WordGraph:loadFromLuaFile(dictionaryFilename)
+    local startTime = os.time()
+    local wordGraph = assert(loadfile(dictionaryFilename)())
+    print('Loaded dictionary.  Time ' .. (os.time() - startTime) .. ' sec')
+    self.graph = wordGraph.graph
+    self.alphaSorted = wordGraph.alphabet
+    local graph = self.graph
+    for wordString, wordsTable in pairs(graph) do
+        graph[wordString] = Word:newFromTable(wordsTable)
+    end
+end
+
+function WordGraph:loadFromTextFile(dictionaryFilename, logProgress)
+    local dictionaryFile = io.open(dictionaryFilename, 'r')
+    if (not dictionaryFile) then
+        error('ERROR: Unable open dictionary.')
+    end
+
     -- The possible characters supported by this dictionary
     local alphabet = {}
     local alphaSorted = {}
@@ -65,7 +93,9 @@ function WordGraph:_initializeInstance(dictionaryFile)
     -- A graph of the words and their relationships.
     local graph = {}
 
-    print('Generating hashmap of all words')
+    if logProgress then
+        print('Generating hashmap of all words')
+    end
 
     -- Iterate over each line in the dictionary...
     for line in dictionaryFile:lines() do
@@ -100,7 +130,9 @@ function WordGraph:_initializeInstance(dictionaryFile)
         end
     end
 
-    print('Populating adjacency list')
+    if logProgress then
+        print('Populating adjacency list')
+    end
 
     -- At this point, the graph contains all possible words as keys.  Each word can be
     -- thought of as a node in the graph.  The table corresponding to each node will
@@ -143,8 +175,21 @@ function WordGraph:_initializeInstance(dictionaryFile)
 
     self.graph = graph
     self.alphaSorted = alphaSorted
+    dictionaryFile:close()
 
-    print('Adjacency list ready')
+    if logProgress then
+        print('Adjacency list ready')
+    end
+end
+
+function WordGraph:serialize(file)
+    -- local outputGraph = {}
+    -- for wordString, word in pairs(self.graph) do
+    --     outputGraph[wordString] = word:getRelatives()
+    -- end
+    local outputTable = {graph = self.graph, alphabet = self.alphaSorted}
+    file:write('return ')
+    util.printTable(file, outputTable)
 end
 
 function WordGraph:print()

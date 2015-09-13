@@ -1,6 +1,15 @@
 local setmetatable = setmetatable
+local string = string
+local type = type
+local table = table
+local pairs = pairs
+local ipairs = ipairs
+local tostring = tostring
+local error = error
 
 module(...)
+
+local DEFAULT_INDENT = '    '
 
 -- A function used as a no-op.
 function nilFunction()
@@ -23,14 +32,19 @@ function createClass(baseClass, isAbstract)
 
     if not isAbstract then
         function newClass:new(...)
-            local newInstance = {}
+            return self:newFromTable(nil, ...)
+        end
+
+        function newClass:newFromTable(newInstance, ...)
+            local initFromTable = (newInstance ~= nil)
+            newInstance = newInstance and newInstance or {}
             setmetatable(newInstance, newClassMeta)
 
             if newClass._initializeInstance then
-                newClass._initializeInstance(newInstance, ...)
+                newClass._initializeInstance(newInstance, initFromTable, ...)
 
             elseif baseClass and baseClass._initializeInstance then
-                baseClass._initializeInstance(newInstance, ...)
+                baseClass._initializeInstance(newInstance, initFromTable, ...)
             end
 
             return newInstance
@@ -64,6 +78,74 @@ function addPropertyAccessFunctions(class, variableName, getterName, setterName)
     class[setterName] = function(self, value)
         self[variableName] = value
     end
+end
+
+function printTable(file, t, indent, keys, printTrailingComma, appendTable)
+    local containsNonIndexKeys
+    if not keys then
+        keys = {}
+        for k, v in pairs(t) do
+            keys[#keys + 1] = k
+            if (not containsNonIndexKeys) and (type(k) ~= 'number') then
+                containsNonIndexKeys = true
+            end
+        end
+        table.sort(keys)
+    end
+
+    local originalIndent = indent
+    indent = indent and (indent .. DEFAULT_INDENT) or DEFAULT_INDENT
+
+    if not appendTable then
+        file:write('{')
+        if containsNonIndexKeys then
+            file:write('\n')
+        end
+    end
+
+    local tableNonEmpty = #keys > 0
+    local multiline = containsNonIndexKeys
+    local valueSeparator = containsNonIndexKeys and ',\n' or ','
+    for index, k in ipairs(keys) do
+        local v = t[k]
+        if multiline then
+            file:write(indent)
+        end
+        local kType = type(k)
+        if kType == 'string' then
+            file:write('[\'' .. k .. '\'] = ')
+        elseif kType ~= 'number' then
+            error('Unsupported key type: ' .. tostring(kType) .. ' for key: ' .. tostring(k))
+        end
+
+        local curValueSeparator = (index == #keys) and (multiline and valueSeparator or '') or valueSeparator
+        local vType = type(v)
+        if vType == 'string' then
+            file:write('\'' .. v .. '\'' .. curValueSeparator)
+        elseif (vType == 'boolean') or (vType == 'number') then
+            file:write(tostring(v) .. curValueSeparator)
+        elseif (vType == 'table') then
+            printTable(file, v, indent, nil, true)
+        else
+            error('Unsupported value type: ' .. tostring(vType) .. ' for value: ' .. tostring(v))
+        end
+    end
+
+    if originalIndent and tableNonEmpty and containsNonIndexKeys then
+        file:write(originalIndent)
+    end
+
+    if not appendTable then
+        if printTrailingComma then
+            file:write('},\n')
+        else
+            file:write('}\n')
+        end
+    end
+end
+
+function stringEndsWith(str, endStr)
+    return (endStr == '') or (string.sub(str, -string.len(endStr)) == endStr)
 end
 
 -- This function generates a char array from each character of the given string.  The string can

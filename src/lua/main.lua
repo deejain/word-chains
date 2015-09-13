@@ -40,71 +40,65 @@ function main(dictionary)
     print('---------------------------------------')
 
     local startTime = os.time()
-    print('Opening: ' .. dictionary)
-    local dictionaryFile = io.open(dictionary, 'r')
-    if (not dictionaryFile) then
-        print('ERROR: Unable open dictionary.')
-    else
-        local graph = wordGraphModule.WordGraph:new(dictionaryFile)
-        dictionaryFile:close()
-        print('Graph ready. Time ' .. os.time() - startTime .. ' sec')
+    print('Dictionary: ' .. dictionary)
+    local graph = wordGraphModule.WordGraph:new(dictionary)
+    print('Graph ready. Time ' .. os.time() - startTime .. ' sec')
 
-        usage()
-        local command
-        while(true) do
-            io.write('\nPlease enter a command: ')
-            io.flush()
-            command = io.read()
-            if command == 'quit' then
-                break
-            elseif command == 'help' then
-                usage()
-            elseif command == 'list' then
-                graph:print()
-            elseif command == 'alpha' then
-                 io.write('Alphabet: ')
-                 for _, char in ipairs(graph:getAlphabet()) do
-                     io.write(char)
-                     io.write(' ')
-                 end
-                 io.write('\n')
-                 io.flush()
+    usage()
+    local command
+    while(true) do
+        io.write('\nPlease enter a command: ')
+        io.flush()
+        command = io.read()
+        if command == 'quit' then
+            break
+        elseif command == 'help' then
+            usage()
+        elseif command == 'list' then
+            graph:print()
+        elseif command == 'alpha' then
+             io.write('Alphabet: ')
+             for _, char in ipairs(graph:getAlphabet()) do
+                 io.write(char)
+                 io.write(' ')
+             end
+             io.write('\n')
+             io.flush()
+        else
+            local words = {}
+            for word in command:gmatch("%w+") do
+                table.insert(words, word)
+            end
+            if (words[1] == 'dfs') or (words[1] == 'bfs') then
+                local startWord = words[2]
+                local endWord = words[3]
+                local valid = true
+                if not graph:isWordValid(startWord) then
+                    print('Invalid startWord: ' .. startWord)
+                    valid = false
+                end
+                if not graph:isWordValid(endWord) then
+                    print('Invalid endWord: ' .. endWord)
+                    valid = false
+                end
+
+                if valid then
+                    local searchName
+                    local searchFunctionName
+                    if (words[1] == 'dfs') then
+                        searchName = 'Depth-frist'
+                        searchFunctionName = 'getWordChainDepthFirst'
+                    else
+                        searchName = 'Breadth-frist'
+                        searchFunctionName = 'getWordChainBreadthFirst'
+                    end
+                    print('\n' .. searchName .. ' search: ' .. startWord .. ' - ' .. endWord)
+                    startTime = os.time()
+                    local result = graph[searchFunctionName](graph, startWord, endWord)
+                    printResult(result, os.time() - startTime)
+                end
             else
-                local words = {}
-                for word in command:gmatch("%w+") do
-                    table.insert(words, word)
-                end
-                if (words[1] == 'dfs') or (words[1] == 'bfs') then
-                    local startWord = words[2]
-                    local endWord = words[3]
-                    local valid = true
-                    if not graph:isWordValid(startWord) then
-                        print('Invalid startWord: ' .. startWord)
-                        valid = false
-                    end
-                    if not graph:isWordValid(endWord) then
-                        print('Invalid endWord: ' .. endWord)
-                        valid = false
-                    end
-
-                    if valid then
-                        local searchName
-                        local searchFunctionName
-                        if (words[1] == 'dfs') then
-                            searchName = 'Depth-frist'
-                            searchFunctionName = 'getWordChainDepthFirst'
-                        else
-                            searchName = 'Breadth-frist'
-                            searchFunctionName = 'getWordChainBreadthFirst'
-                        end
-                        print('\n' .. searchName .. ' search: ' .. startWord .. ' - ' .. endWord)
-                        startTime = os.time()
-                        local result = graph[searchFunctionName](graph, startWord, endWord)
-                        printResult(result, os.time() - startTime)
-                    end
-                else
-                    print('Unknown command: ' .. command)
-                end
+                print('Unknown command: ' .. command)
             end
         end
     end
