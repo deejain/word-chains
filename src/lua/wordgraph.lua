@@ -1,12 +1,14 @@
 local util = require('util')
 
+local assert = assert
 local print = print
 local open = io.open
 local ipairs = ipairs
 local pairs = pairs
 local table = table
 local io = io
-
+local os = os
+local string = string
 module(...)
 
 WordGraph = util.createClass()
@@ -21,14 +23,23 @@ util.addPropertyAccessFunctions(Word, "chars")
 -- A flag used to store whether the given word has been visited.
 util.addPropertyAccessFunctions(Word, "visited", "isVisited", "setVisited")
 
--- A flag used to store whether the given word has been visited.
+-- A table containing a list of related words based on string keys.
 util.addPropertyAccessFunctions(Word, "relatives")
 
+-- A reference to the predecessor Word object (used for breadth-first search)
+util.addPropertyAccessFunctions(Word, "predecessor")
+
+local DEUBG = false
+
+-- Word class constructor.
+-- wordString
 function Word:_initializeInstance(wordString)
+    assert((wordString ~= nil) and (wordString ~= ''))
     self:setString(wordString)
     self:setChars(util.getCharArray(wordString))
     self:setRelatives({})
     self:setVisited(false)
+    self:setPredecessor(nil)
 end
 
 function Word:toString()
@@ -46,7 +57,6 @@ function Word:setRelated(relatedWord)
     relatedWord.relatives[self:getString()] = true
 end
 
-
 function WordGraph:_initializeInstance(dictionaryFile)
     -- The possible characters supported by this dictionary
     local alphabet = {}
@@ -54,6 +64,8 @@ function WordGraph:_initializeInstance(dictionaryFile)
 
     -- A graph of the words and their relationships.
     local graph = {}
+
+    print('Generating hashmap of all words')
 
     -- Iterate over each line in the dictionary...
     for line in dictionaryFile:lines() do
@@ -87,6 +99,8 @@ function WordGraph:_initializeInstance(dictionaryFile)
             word:setRelated(relatedWord)
         end
     end
+
+    print('Populating adjacency list')
 
     -- At this point, the graph contains all possible words as keys.  Each word can be
     -- thought of as a node in the graph.  The table corresponding to each node will
@@ -127,29 +141,23 @@ function WordGraph:_initializeInstance(dictionaryFile)
         word:setChars(nil)
     end
 
-    -- io.write('Alphabet: ')
-    -- for _, char in ipairs(alphaSorted) do
-    --     io.write(char)
-    --     io.write(' ')
-    -- end
-    -- io.write('\n')
-    -- io.flush()
-
     self.graph = graph
     self.alphaSorted = alphaSorted
-    self:print()
+
+    print('Adjacency list ready')
 end
 
 function WordGraph:print()
-    print('Graph: (- not visited, + visited)')
+    print('Graph: (+ node visited, - not visited)')
     for _, word in pairs(self.graph) do
         print('  ' .. word:toString())
     end
 end
 
-function WordGraph:resetVisitedState()
+function WordGraph:resetStates()
     for _, word in pairs(self.graph) do
         word:setVisited(false)
+        word:setPredecessor(nil)
     end
 end
 
@@ -161,12 +169,15 @@ function WordGraph:isWordValid(wordString)
     return (wordString ~= nil) and (self.graph[wordString] ~= nil)
 end
 
+
 function WordGraph:depthFirstSearch(stack, curWordString, endWordString)
     local success = false
     local curWord = self.graph[curWordString]
 
     -- Push the current word on top of the stack and visit it
-    print('push: ' .. curWordString)
+    if DEBUG then
+        print('push: ' .. curWordString)
+    end
     stack[#stack + 1] = curWordString
     curWord:setVisited(true)
 
@@ -196,7 +207,9 @@ function WordGraph:depthFirstSearch(stack, curWordString, endWordString)
     -- If at the current word we weren't able to find any successful traversals to the end node,
     -- we'll pop the current node off the stack.
     if not success then
-        print('pop: ' .. stack[#stack])
+        if DEBUG then
+            print('pop: ' .. stack[#stack])
+        end
         stack[#stack] = nil
     end
 
@@ -204,36 +217,86 @@ function WordGraph:depthFirstSearch(stack, curWordString, endWordString)
 end
 
 function WordGraph:getWordChainDepthFirst(startWord, endWord)
+    self:resetStates()
     local result = nil
-    print('Depth-First Search: ' .. startWord .. ' - ' .. endWord)
     if not self:isWordValid(startWord) then
         print('Invalid startWord: ' .. startWord)
     elseif not self:isWordValid(endWord) then
         print('Invalid endWord: ' .. endWord)
     else
         result = {}
-        local success = self:depthFirstSearch(result, startWord, endWord)
-        if success then
-            print('Found chain!')
-            for index, wordString in ipairs(result) do
-                if (index > 1) then
-                        io.write(' -> ')
-                end
-                io.write(wordString)
-            end
-            io.write('\n')
-            io.flush()
-        else
-            print('No chain found :(')
+        self:depthFirstSearch(result, startWord, endWord)
+        if #result == 0 then
+            result = nil
         end
-        self:print()
-
     end
-
     return result
 end
 
-function WordGraph:getWordChainsBreadthFirst(startWord, endWord)
-    -- coming soon.
+function WordGraph:breadthFirstSearch(result, startWordString, endWordString)
+    local graph = self.graph
+    local startWord  = graph[startWordString]
+    local queue = {startWord}
+
+    -- Flag the starting word as visited.
+    startWord:setVisited(true)
+
+    while(#queue > 0) do
+        -- Dequeue the first word
+        local curWord = table.remove(queue, 1)
+
+        -- For all relatives of the current word, we push each relative onto the queue
+        -- and mark the relative as visited.  We also set the predecessor for each word
+        -- to be the current word
+        for relatedWordString, _ in pairs(curWord:getRelatives()) do
+            local relatedWord = graph[relatedWordString]
+            if not relatedWord:isVisited() then
+                relatedWord:setVisited(true)
+                relatedWord:setPredecessor(curWord)
+
+                if (relatedWordString == endWordString) then
+                    -- We've reached our desired endpoint. To determine the path that brought
+                    -- us here, we have to work our way backwards
+                    local word = relatedWord
+                    local endToStart = {relatedWord:getString()}
+                    while (word:getPredecessor() ~= nil) do
+                        word = word:getPredecessor()
+                        endToStart[#endToStart + 1] = word:getString()
+                    end
+
+                    -- Reverse the list order
+                    for i = #endToStart, 1, -1 do
+                        result[#result + 1] = endToStart[i]
+                    end
+                    break
+                else
+                    queue[#queue + 1] = relatedWord
+                end
+            end
+        end
+
+        -- If the results table is non-empty, then we've found a solution.  We can stop now.
+        if #result > 0 then
+            break
+        end
+    end
+end
+
+function WordGraph:getWordChainBreadthFirst(startWord, endWord)
+    self:resetStates()
+    local result = nil
+    if not self:isWordValid(startWord) then
+        print('Invalid startWord: ' .. startWord)
+    elseif not self:isWordValid(endWord) then
+        print('Invalid endWord: ' .. endWord)
+    else
+        result = {}
+        self:breadthFirstSearch(result, startWord, endWord)
+        if #result == 0 then
+            result = nil
+        end
+    end
+
+    return result
 end
 
