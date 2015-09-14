@@ -35,14 +35,19 @@ local DEUBG = false
 -- Word class constructor.
 -- wordString
 function Word:_initializeInstance(initFromTable, wordString)
-    if not initFromTable then
-        assert((wordString ~= nil) and (wordString ~= ''))
-        self:setString(wordString)
+    assert((wordString ~= nil) and (wordString ~= ''))
+    if initFromTable then
+        if self.r then
+            self.relatives = self.r
+            self.r = nil
+        end
+    else
         self:setChars(util.getCharArray(wordString))
         self:setRelatives({})
         self:setVisited(nil)
         self:setPredecessor(nil)
     end
+    self:setString(wordString)
 end
 
 function Word:toString()
@@ -76,7 +81,7 @@ function WordGraph:loadFromLuaFile(dictionaryFilename)
     self.alphaSorted = wordGraph.alphabet
     local graph = self.graph
     for wordString, wordsTable in pairs(graph) do
-        graph[wordString] = Word:newFromTable(wordsTable)
+        graph[wordString] = Word:newFromTable(wordsTable, wordString)
     end
 end
 
@@ -182,14 +187,15 @@ function WordGraph:loadFromTextFile(dictionaryFilename, logProgress)
     end
 end
 
-function WordGraph:serialize(file)
-    -- local outputGraph = {}
-    -- for wordString, word in pairs(self.graph) do
-    --     outputGraph[wordString] = word:getRelatives()
-    -- end
-    local outputTable = {graph = self.graph, alphabet = self.alphaSorted}
+function WordGraph:serialize(file, readable)
+    local outputGraph = {}
+    local relativesHashName = readable and 'relatives' or 'r'
+    for wordString, word in pairs(self.graph) do
+        outputGraph[wordString] = {[relativesHashName] = word:getRelatives()}
+    end
+    local outputTable = {graph = outputGraph, alphabet = self.alphaSorted}
     file:write('return ')
-    util.printTable(file, outputTable)
+    util.printTable(file, outputTable, nil, nil, nil, readable)
 end
 
 function WordGraph:print()

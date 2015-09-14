@@ -2,6 +2,7 @@ local generatorFilename = arg[1]
 local packagePath = arg[2]
 local dictionaryFile = arg[3]
 local outputFile = arg[4]
+local readableOutputFile = arg[5]
 
 -- Update the package path so that we can load primary source modules
 package.path = packagePath .. package.path
@@ -12,6 +13,7 @@ local wordGraphModule = require('wordgraph')
 --print('Package Path: ' .. package.path)
 --print('Dictionary File: ' .. dictionaryFile)
 --print('Output File: ' .. outputFile)
+--print('Readable: ' .. tostring(readableOutputFile))
 
 local function printHeader(file, generatorFilename, dictionaryFile)
     file:write('-- \n-- AUTO-GENERATED FILE - DO NOT MODIFY MANUALLY\n')
@@ -21,13 +23,17 @@ local function printHeader(file, generatorFilename, dictionaryFile)
 end
 
 local function main()
-    local file = io.open(outputFile, 'w')
-    printHeader(file, generatorFilename, dictionaryFile)
-
     local graph = wordGraphModule.WordGraph:new(dictionaryFile)
-    graph:serialize(file)
 
-    file:close()
+    local export = function(filename, readableOutput)
+        local file = io.open(filename, 'w')
+        printHeader(file, generatorFilename, dictionaryFile)
+        graph:serialize(file, readableOutput)
+        file:close()
+    end
+
+    export(outputFile, false)
+    export(readableOutputFile, true)
 end
 
 

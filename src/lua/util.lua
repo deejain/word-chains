@@ -80,7 +80,13 @@ function addPropertyAccessFunctions(class, variableName, getterName, setterName)
     end
 end
 
-function printTable(file, t, indent, keys, printTrailingComma, appendTable)
+local LUA_KEYWORDS = { ['and'] = 1, ['or'] = 1, ['function'] = 1, ['local'] = 1, ['reqiure'] = 1, ['module'] = 1, ['end'] =  1,
+                       ['then'] = 1, ['if'] = 1, ['else'] = 1, ['elseif'] = 1, ['error'] = 1, ['assert'] = 1, ['not'] = 1,
+                       ['do'] = 1, ['type'] = 1, ['os'] = 1, ['table'] = 1, ['string'] = 1, ['tostring'] = 1, ['setmetatable'] = 1,
+                       ['print'] = 1, ['nil'] = 1, ['in'] = 1, ['while'] = 1, ['break'] = 1, ['for'] = 1, ['false'] = 1, ['true'] = 1,
+                       ['until'] = 1, ['repeat'] = 1, ['return'] = 1}
+
+function printTable(file, t, indent, keys, printTrailingComma, readable, appendTable)
     local containsNonIndexKeys
     if not keys then
         keys = {}
@@ -93,19 +99,21 @@ function printTable(file, t, indent, keys, printTrailingComma, appendTable)
         table.sort(keys)
     end
 
+    local defaultIndent = readable and DEFAULT_INDENT or ''
+    local newLine = readable and '\n' or ''
     local originalIndent = indent
-    indent = indent and (indent .. DEFAULT_INDENT) or DEFAULT_INDENT
+    indent = indent and (indent .. defaultIndent) or defaultIndent
 
     if not appendTable then
         file:write('{')
         if containsNonIndexKeys then
-            file:write('\n')
+            file:write(newLine)
         end
     end
 
     local tableNonEmpty = #keys > 0
     local multiline = containsNonIndexKeys
-    local valueSeparator = containsNonIndexKeys and ',\n' or ','
+    local valueSeparator = containsNonIndexKeys and (',' .. newLine) or ','
     for index, k in ipairs(keys) do
         local v = t[k]
         if multiline then
@@ -113,19 +121,35 @@ function printTable(file, t, indent, keys, printTrailingComma, appendTable)
         end
         local kType = type(k)
         if kType == 'string' then
-            file:write('[\'' .. k .. '\'] = ')
+            if LUA_KEYWORDS[k] or string.find(k, '-') then
+                file:write('[\'' .. k .. '\']')
+            else
+                file:write(k)
+            end
+            if readable then
+                file:write(' = ')
+            else
+                file:write('=')
+            end
         elseif kType ~= 'number' then
             error('Unsupported key type: ' .. tostring(kType) .. ' for key: ' .. tostring(k))
         end
 
-        local curValueSeparator = (index == #keys) and (multiline and valueSeparator or '') or valueSeparator
+        local isLastEntry = (index == #keys)
+        local curValueSeparator = isLastEntry and (multiline and newLine or '') or valueSeparator
         local vType = type(v)
         if vType == 'string' then
             file:write('\'' .. v .. '\'' .. curValueSeparator)
-        elseif (vType == 'boolean') or (vType == 'number') then
+        elseif (vType == 'boolean') then
+            if readable then
+                file:write(tostring(v) .. curValueSeparator)
+            else
+                file:write((v and '1' or '0') .. curValueSeparator)
+            end
+        elseif (vType == 'number') then
             file:write(tostring(v) .. curValueSeparator)
         elseif (vType == 'table') then
-            printTable(file, v, indent, nil, true)
+            printTable(file, v, indent, nil, not isLastEntry, readable)
         else
             error('Unsupported value type: ' .. tostring(vType) .. ' for value: ' .. tostring(v))
         end
@@ -136,11 +160,11 @@ function printTable(file, t, indent, keys, printTrailingComma, appendTable)
     end
 
     if not appendTable then
+        file:write('}')
         if printTrailingComma then
-            file:write('},\n')
-        else
-            file:write('}\n')
+            file:write(',')
         end
+        file:write(newLine)
     end
 end
 

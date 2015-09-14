@@ -35,9 +35,11 @@ end
 function main(dictionary)
     dictionary = dictionary and dictionary or DEFAULT_DICTIONARY
 
+    print('')
     print('---------------------------------------')
-    print(' WORD CHAINS')
+    print('--           WORD CHAINS             --')
     print('---------------------------------------')
+    print('')
 
     local startTime = os.time()
     print('Dictionary: ' .. dictionary)
