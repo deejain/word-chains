@@ -12,6 +12,7 @@ Depth-first search will any path from the start word to the end word, if one exi
 Here's a detailed breakdown of the solution.
 
 **Dictionary Loading**
+
 1. Load the dictionary into memory -- a hashtable.  While doing this, you can determine the alphabet of the given dictioanry by looking at each character of each word and adding it to a given hashtable.  This has O(C) computation and space complexity, where C is the total number of characters in the dictioanry.
 2. For each word in the dictionary, go through each character and remove the character and test whether the resulting string results in a valid word.  If it does, flag the current word as being related to this shorter word, and vice-versa.
 3. For each word in the dictionary, go through each character and change the character to any of the characters in the alphabet to see if it results in a valid word.  If it does, flag the current word and  being related to the composed word, and vice-versa.
@@ -19,6 +20,7 @@ Here's a detailed breakdown of the solution.
 Steps 2 and 3 can be done in the same loop that goes through each word in the dictionary and each character within each word.  They have time complexity of O(C * Alphabet_size), where C is the total number of characters in the dictionary.  Note that since the alphabet size is a constant, the time complexity is O(C).
 
 **Searching**
+
 The searching algorithms are fairly standard.  So, they will not be discussed in detail here.  Please see ./src/lua/wordgraph.lua for the implementation of the searches.
 
 Both breadth-first and depth-first searches have O(W + R) worst case performance, where W is the total number of words and R is the total number of relationships between the words.   Since we use an adjacency list to store the graph, the space complexity is also O(W + R).
