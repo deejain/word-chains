@@ -20,10 +20,13 @@ GENERATED_LUA_FILES:=$(patsubst $(DATA_DIR)/%.txt, $(GENERATED_OUTPUT_DIR)/%.lua
 LUA_OUTPUT_FILES:=$(patsubst $(LUA_SOURCE_PATH)/%.lua, $(LUA_OUTPUT_DIR)/%.lua, $(LUA_SOURCE_FILES)) \
 				  $(patsubst $(GENERATED_OUTPUT_DIR)/%.lua, $(LUA_OUTPUT_DIR)/%.lua, $(GENERATED_LUA_FILES))
 
+# Uncomment the target below to print all variables.
 # .PHONY: printvars
 # printvars:
 # 	@$(foreach V,$(sort $(.VARIABLES)),$(if $(filter-out environment% default automatic,$(origin $V)),$(warning $V=$($V) ($(value $V)))))
 
+# Note, for now, we're not including the build target because the LuaJIT complains about compiling words.lua, since it has more than
+# 65,536 constants (strings).  In the the future, we may just want to compile the source files and use the raw Lua adjacency list files.
 all: prebuild
 
 prebuild: $(GENERATED_LUA_FILES)
