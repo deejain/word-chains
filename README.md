@@ -45,6 +45,7 @@ In order to run this solution, you must have the following installed on your mac
 - Lua
 
 If you need those tools, perform the following steps.
+
 1. Install Homebrew - http://brew.sh
 2. In a Terminal window, run 'brew install git lua'
 
